@@ -24,8 +24,8 @@ Forwarding is enabled automatically only for Android sessions whose peer reports
 
 ## Verified checkpoint
 
-On 2026-10-02, one Xbox controller was verified end to end from the Galaxy S21 to the Windows host. The Windows diagnostic log confirmed incoming reports and a ready ViGEm Xbox 360 target; the user confirmed the controller works in-game. This checkpoint supports one controller per RustDesk session. Multiple controllers are not supported yet: reports do not carry a controller ID, and the Windows input worker owns one virtual target.
+On 2026-10-02, one Xbox controller was verified end to end from the Galaxy S21 to the Windows host. The Windows diagnostic log confirmed incoming reports and a ready ViGEm Xbox 360 target; the user confirmed the controller works in-game. This checkpoint verifies one controller per RustDesk session.
 
 ## Two-controller work in progress
 
-The follow-up implementation now carries Android's per-device ID and a disconnect flag through the protocol. The Windows input worker keeps a separate ViGEm target for each ID and removes that target when Android reports the controller unplugged. The Windows build and Rust type-check pass; the Android package has not been rebuilt or tested with two controllers yet.
+The follow-up implementation carries Android's per-device ID and a disconnect flag through the protocol. The Windows input worker keeps a separate ViGEm target for each ID and removes that target when Android reports the controller unplugged. The Windows Rust library and Flutter bundle build. A side-by-side Android ARM64 test app is installed without replacing the official RustDesk app; Android reports two separate Xbox devices, and a raw input capture saw analog input from one of them. The phone stayed on its lock screen during this attempt, so no RustDesk remote session or forwarded gamepad input was verified. A dual-controller Windows bundle is staged, but the active Windows service remains on the single-controller build. Do not treat two-controller support as verified until both pads are seen independently in a Windows game or controller panel and unplugging one leaves the other working.

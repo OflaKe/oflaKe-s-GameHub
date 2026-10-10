@@ -13,6 +13,7 @@ import '../../common/widgets/dialog.dart';
 import '../../consts.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
+import '../widgets/xbox_gamepad_status.dart';
 import 'home_page.dart';
 
 class ServerPage extends StatefulWidget implements PageShape {
@@ -406,7 +407,7 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
                                 }
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
+                          backgroundColor: MyTheme.accent,
                         ),
                         child: Text(
                           isButtonLocked
@@ -429,7 +430,7 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
                           Navigator.of(context).pop();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
+                          backgroundColor: MyTheme.accent,
                         ),
                         child: Text(
                           translate("Decline"),
@@ -897,6 +898,15 @@ void androidChannelInit() {
     debugPrint("flutter got android msg,$method,$arguments");
     try {
       switch (method) {
+        case "xbox_gamepad_devices_changed":
+          {
+            final devices = (arguments as List<dynamic>? ?? const [])
+                .whereType<Map>()
+                .map((device) => Map<String, dynamic>.from(device))
+                .toList(growable: false);
+            connectedGamepadDevices.value = devices;
+            break;
+          }
         case "start_capture":
           {
             gFFI.dialogManager.dismissAll();

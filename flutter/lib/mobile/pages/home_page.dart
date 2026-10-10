@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/mobile/pages/server_page.dart';
 import 'package:flutter_hbb/mobile/pages/settings_page.dart';
+import 'package:flutter_hbb/mobile/pages/xbox_game_setup_page.dart';
 import 'package:flutter_hbb/web/settings_page.dart';
 import 'package:get/get.dart';
 import '../../common.dart';
@@ -33,6 +34,12 @@ class HomePageState extends State<HomePage> {
       ? _selectedIndex == _chatPageTabIndex
       : false; // change this when ios have chat page
 
+  void selectSetupTab() {
+    final setupIndex = _pages.indexWhere((page) => page is XboxGameSetupPage);
+    if (setupIndex < 0 || !mounted) return;
+    setState(() => _selectedIndex = setupIndex);
+  }
+
   void refreshPages() {
     setState(() {
       initPages();
@@ -51,6 +58,7 @@ class HomePageState extends State<HomePage> {
       _pages.add(ConnectionPage(
         appBarActions: [],
       ));
+      if (isAndroid) _pages.add(XboxGameSetupPage());
     }
     if (isAndroid && !bind.isOutgoingOnly()) {
       _chatPageTabIndex = _pages.length;
@@ -75,7 +83,8 @@ class HomePageState extends State<HomePage> {
         child: Scaffold(
           // backgroundColor: MyTheme.grayBg,
           appBar: AppBar(
-            centerTitle: true,
+            centerTitle: !isAndroid,
+            titleSpacing: isAndroid ? 16 : null,
             title: appTitle(),
             actions: _pages.elementAt(_selectedIndex).appBarActions,
           ),
@@ -87,8 +96,11 @@ class HomePageState extends State<HomePage> {
                 .toList(),
             currentIndex: _selectedIndex,
             type: BottomNavigationBarType.fixed,
-            selectedItemColor: MyTheme.accent, //
-            unselectedItemColor: MyTheme.darkGray,
+            backgroundColor:
+                Theme.of(context).bottomNavigationBarTheme.backgroundColor,
+            selectedItemColor: Theme.of(context).colorScheme.primary,
+            unselectedItemColor:
+                Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
             onTap: (index) => setState(() {
               // close chat overlay when go chat page
               if (_selectedIndex != index) {
@@ -146,6 +158,45 @@ class HomePageState extends State<HomePage> {
                 ],
               ),
             ),
+          ),
+        ],
+      );
+    }
+    if (isAndroid) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF29233E),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Text(
+              'OF',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1,
+              ),
+            ),
+          ),
+          const SizedBox(width: 11),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("OflaKe's Game Hub",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              Text('REMOTE PLAY',
+                  style: TextStyle(
+                    fontSize: 9,
+                    letterSpacing: 1.7,
+                    color: Theme.of(context).hintColor,
+                  )),
+            ],
           ),
         ],
       );
@@ -245,11 +296,11 @@ class WebHomePage extends StatelessWidget {
       }
     }
     if (id != null) {
-      connect(context, id, 
-        isFileTransfer: isFileTransfer, 
-        isViewCamera: isViewCamera, 
-        isTerminal: isTerminal,
-        password: password);
+      connect(context, id,
+          isFileTransfer: isFileTransfer,
+          isViewCamera: isViewCamera,
+          isTerminal: isTerminal,
+          password: password);
     }
   }
 }

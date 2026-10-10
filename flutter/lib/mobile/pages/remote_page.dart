@@ -23,6 +23,7 @@ import '../../models/model.dart';
 import '../../models/platform_model.dart';
 import '../../utils/image.dart';
 import '../widgets/dialog.dart';
+import 'xbox_game_setup_page.dart';
 import '../widgets/custom_scale_widget.dart';
 
 final initText = '1' * 1024;
@@ -788,6 +789,15 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     final menus = toolbarControls(context, id, gFFI);
 
     final List<PopupMenuEntry<int>> more = [
+      const PopupMenuItem<int>(
+        value: -1,
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.sports_esports_rounded),
+          title: Text('Game setup'),
+        ),
+      ),
+      const PopupMenuDivider(),
       ...mobileActionMenus
           .asMap()
           .entries
@@ -811,7 +821,20 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
         elevation: 8,
       );
       if (index != null) {
-        if (index < mobileActionMenus.length) {
+        if (index == -1) {
+          showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => FractionallySizedBox(
+              heightFactor: 0.82,
+              child: Material(
+                child: SafeArea(
+                  child: XboxGameSetupPanel(showHeading: false),
+                ),
+              ),
+            ),
+          );
+        } else if (index < mobileActionMenus.length) {
           mobileActionMenus[index].onPressed?.call();
         } else if (index < mobileActionMenus.length + more.length) {
           menus[index - mobileActionMenus.length].onPressed?.call();

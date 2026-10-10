@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
+import 'package:flutter_hbb/mobile/widgets/xbox_gamepad_status.dart';
 
 import '../../common.dart';
 import '../../common/widgets/peer_tab_page.dart';
@@ -84,6 +85,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       slivers: [
         SliverList(
             delegate: SliverChildListDelegate([
+          if (isAndroid) _buildGameHubHero(context),
           if (!bind.isCustomClient() && !isIOS)
             Obx(() => _buildUpdateUI(stateGlobal.updateUrl.value)),
           _buildRemoteIDTextField(),
@@ -94,6 +96,106 @@ class _ConnectionPageState extends State<ConnectionPage> {
         )
       ],
     ).marginOnly(top: 2, left: 10, right: 10);
+  }
+
+  Widget _buildGameHubHero(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: const Color(0xFF292E3C)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF29233E),
+            Theme.of(context).cardColor,
+            const Color(0xFF151821),
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -8,
+            top: -15,
+            child: Icon(
+              Icons.sports_martial_arts_rounded,
+              size: 105,
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.10),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'READY TO PLAY',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.7,
+                ),
+              ),
+              const SizedBox(height: 7),
+              const Text(
+                'Mortal Kombat',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Conectează-te la PC și intră direct în joc.',
+                style: TextStyle(color: Theme.of(context).hintColor),
+              ),
+              const SizedBox(height: 15),
+              ValueListenableBuilder<List<Map<String, dynamic>>>(
+                valueListenable: connectedGamepadDevices,
+                builder: (context, devices, _) => Row(
+                  children: [
+                    Icon(Icons.sports_esports_rounded,
+                        size: 18, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 7),
+                    Text('${devices.length} manete conectate'),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () =>
+                          HomePage.homeKey.currentState?.selectSetupTab(),
+                      child: const Text('SETUP'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    if (_idController.id.isNotEmpty) {
+                      onConnect();
+                    } else {
+                      _idFocusNode.requestFocus();
+                    }
+                  },
+                  icon: const Icon(Icons.sports_esports_rounded),
+                  label: Text(_idController.id.isNotEmpty
+                      ? 'Connect & play'
+                      : 'Introdu ID-ul PC-ului'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: const Color(0xFF171320),
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   /// Callback for the connect button.

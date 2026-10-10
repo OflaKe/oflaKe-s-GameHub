@@ -62,7 +62,6 @@ private const val XINPUT_B = 0x2000
 private const val XINPUT_X = 0x4000
 private const val XINPUT_Y = 0x8000
 private const val DPAD_MASK = 0x000F
-private const val MICROSOFT_VENDOR_ID = 0x045e
 
 class MainActivity : FlutterActivity() {
     companion object {
@@ -98,14 +97,15 @@ class MainActivity : FlutterActivity() {
     private var forwardXboxGamepad = false
     private val gamepadStates = mutableMapOf<Int, XboxGamepadState>()
     private val inputDeviceListener = object : InputManager.InputDeviceListener {
-        override fun onInputDeviceAdded(deviceId: Int) = Unit
+        override fun onInputDeviceAdded(deviceId: Int) = notifyXboxGamepadDevicesChanged()
 
-        override fun onInputDeviceChanged(deviceId: Int) = Unit
+        override fun onInputDeviceChanged(deviceId: Int) = notifyXboxGamepadDevicesChanged()
 
         override fun onInputDeviceRemoved(deviceId: Int) {
             if (gamepadStates.remove(deviceId) != null) {
                 sendXboxGamepadState(deviceId, XboxGamepadState(), disconnected = true)
             }
+            notifyXboxGamepadDevicesChanged()
         }
     }
 
@@ -148,6 +148,7 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         (getSystemService(Context.INPUT_SERVICE) as? InputManager)
             ?.registerInputDeviceListener(inputDeviceListener, null)
+        notifyXboxGamepadDevicesChanged()
         val inputPer = InputService.isOpen
         activity.runOnUiThread {
             flutterMethodChannel?.invokeMethod(
@@ -165,8 +166,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (!forwardXboxGamepad || !isMicrosoftXboxDevice(event.deviceId) ||
-            !isGamepadSource(event.source)) {
+        if (!forwardXboxGamepad || !isSupportedGamepad(event.deviceId)) {
             return super.dispatchKeyEvent(event)
         }
         val state = gamepadStates.getOrPut(event.deviceId) { XboxGamepadState() }
@@ -197,7 +197,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (!forwardXboxGamepad || !isMicrosoftXboxDevice(event.deviceId) ||
+        if (!forwardXboxGamepad || !isSupportedGamepad(event.deviceId) ||
             event.action != MotionEvent.ACTION_MOVE ||
             event.isFromSource(InputDevice.SOURCE_JOYSTICK).not()) {
             return super.dispatchGenericMotionEvent(event)
@@ -224,8 +224,35 @@ class MainActivity : FlutterActivity() {
         (source and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
             (source and InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD
 
-    private fun isMicrosoftXboxDevice(deviceId: Int): Boolean =
-        InputDevice.getDevice(deviceId)?.vendorId == MICROSOFT_VENDOR_ID
+    private fun isSupportedGamepad(deviceId: Int): Boolean {
+        val device = InputDevice.getDevice(deviceId) ?: return false
+        return !device.isVirtual &&
+            (isGamepadSource(device.sources) ||
+                (device.sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK)
+    }
+
+    private fun getConnectedGamepads(): List<Map<String, Any>> =
+        InputDevice.getDeviceIds().asSequence().mapNotNull { deviceId ->
+            val device = InputDevice.getDevice(deviceId) ?: return@mapNotNull null
+            if (device.isVirtual || !(isGamepadSource(device.sources) ||
+                    (device.sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK)) {
+                return@mapNotNull null
+            }
+            mapOf(
+                "id" to device.id,
+                "name" to device.name,
+                "vendorId" to device.vendorId,
+                "productId" to device.productId,
+                "descriptor" to device.descriptor,
+                "sources" to device.sources
+            )
+        }.toList()
+
+    private fun notifyXboxGamepadDevicesChanged() {
+        runOnUiThread {
+            flutterMethodChannel?.invokeMethod("xbox_gamepad_devices_changed", getConnectedGamepads())
+        }
+    }
 
     private fun xboxButtonForKey(keyCode: Int): Int = when (keyCode) {
         KeyEvent.KEYCODE_BUTTON_A -> XINPUT_A
@@ -489,6 +516,7 @@ class MainActivity : FlutterActivity() {
                     setXboxGamepadForwarding(call.arguments as? Boolean == true)
                     result.success(true)
                 }
+                "get_xbox_gamepads" -> result.success(getConnectedGamepads())
                 "check_permission" -> {
                     if (call.arguments is String) {
                         result.success(XXPermissions.isGranted(context, call.arguments as String))
