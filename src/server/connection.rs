@@ -260,6 +260,8 @@ enum MessageInput {
     Key((KeyEvent, bool)),
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     Pointer((PointerDeviceEvent, i32)),
+    #[cfg(target_os = "windows")]
+    XboxGamepad(XboxGamepadEvent),
     BlockOn,
     BlockOff,
 }
@@ -1240,6 +1242,8 @@ impl Connection {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn handle_input(receiver: std_mpsc::Receiver<MessageInput>, tx: Sender) {
         let mut block_input_mode = false;
+        #[cfg(target_os = "windows")]
+        let mut xbox_gamepad = crate::server::gamepad::XboxGamepad::default();
         #[cfg(any(target_os = "windows", target_os = "macos"))]
         {
             rdev::set_mouse_extra_info(enigo::ENIGO_INPUT_EXTRA_VALUE);
@@ -1275,7 +1279,15 @@ impl Connection {
                     MessageInput::Pointer((msg, id)) => {
                         handle_pointer(&msg, id);
                     }
+                    #[cfg(target_os = "windows")]
+                    MessageInput::XboxGamepad(event) => {
+                        if !block_input_mode {
+                            xbox_gamepad.update(&event);
+                        }
+                    }
                     MessageInput::BlockOn => {
+                        #[cfg(target_os = "windows")]
+                        xbox_gamepad.release();
                         let (ok, msg) = crate::platform::block_input(true);
                         if ok {
                             block_input_mode = true;
@@ -3185,6 +3197,22 @@ impl Connection {
                         );
                     }
                     self.update_auto_disconnect_timer();
+                }
+                Some(message::Union::XboxGamepadEvent(event)) => {
+                    if self.is_authed_view_camera_conn() {
+                        return true;
+                    }
+                    #[cfg(target_os = "windows")]
+                    {
+                        let keyboard_enabled = self.peer_keyboard_enabled();
+                        crate::server::gamepad::trace_received(event.buttons, keyboard_enabled);
+                        if keyboard_enabled {
+                            self.tx_input.send(MessageInput::XboxGamepad(event)).ok();
+                            self.update_auto_disconnect_timer();
+                        }
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    let _ = event;
                 }
                 Some(message::Union::PointerDeviceEvent(pde)) => {
                     if self.is_authed_view_camera_conn() {
@@ -5978,6 +6006,7 @@ impl Connection {
             // The handlers intentionally ignore these messages for view-camera sessions.
             Some(message::Union::MouseEvent(_))
             | Some(message::Union::PointerDeviceEvent(_))
+            | Some(message::Union::XboxGamepadEvent(_))
             | Some(message::Union::KeyEvent(_)) => true,
             Some(message::Union::AudioFrame(_))
             | Some(message::Union::VoiceCallRequest(_))
@@ -6087,6 +6116,7 @@ impl Connection {
     fn message_family(msg: &Message) -> &'static str {
         match msg.union.as_ref() {
             Some(message::Union::MouseEvent(_)) => "mouse_event",
+            Some(message::Union::XboxGamepadEvent(_)) => "xbox_gamepad_event",
             Some(message::Union::AudioFrame(_)) => "audio_frame",
             Some(message::Union::PointerDeviceEvent(_)) => "pointer_device_event",
             Some(message::Union::KeyEvent(_)) => "key_event",

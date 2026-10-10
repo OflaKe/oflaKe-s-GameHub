@@ -780,6 +780,30 @@ impl<T: InvokeUiSession> Session<T> {
         self.send(Data::Message(msg_out));
     }
 
+    pub fn send_xbox_gamepad_event(
+        &self,
+        buttons: u32,
+        left_trigger: u32,
+        right_trigger: u32,
+        left_x: i32,
+        left_y: i32,
+        right_x: i32,
+        right_y: i32,
+    ) {
+        let mut msg_out = Message::new();
+        msg_out.set_xbox_gamepad_event(XboxGamepadEvent {
+            buttons,
+            left_trigger,
+            right_trigger,
+            left_x,
+            left_y,
+            right_x,
+            right_y,
+            ..Default::default()
+        });
+        self.send(Data::Message(msg_out));
+    }
+
     pub fn send_chat(&self, text: String) {
         let mut misc = Misc::new();
         misc.set_chat_message(ChatMessage {

@@ -2053,6 +2053,29 @@ pub fn session_send_mouse(session_id: SessionID, msg: String) {
     }
 }
 
+pub fn session_send_xbox_gamepad_event(
+    session_id: SessionID,
+    buttons: u32,
+    left_trigger: u32,
+    right_trigger: u32,
+    left_x: i32,
+    left_y: i32,
+    right_x: i32,
+    right_y: i32,
+) {
+    if let Some(session) = sessions::get_session_by_session_id(&session_id) {
+        session.send_xbox_gamepad_event(
+            buttons,
+            left_trigger,
+            right_trigger,
+            left_x,
+            left_y,
+            right_x,
+            right_y,
+        );
+    }
+}
+
 pub fn session_restart_remote_device(session_id: SessionID) {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
         session.restart_remote_device();

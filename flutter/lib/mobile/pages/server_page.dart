@@ -932,6 +932,21 @@ void androidChannelInit() {
             msgBox(gFFI.sessionId, type, title, text, link, gFFI.dialogManager);
             break;
           }
+        case "xbox_gamepad_input":
+          {
+            final state = arguments as Map;
+            unawaited(bind.sessionSendXboxGamepadEvent(
+              sessionId: gFFI.sessionId,
+              buttons: (state["buttons"] as num).toInt(),
+              leftTrigger: (state["leftTrigger"] as num).toInt(),
+              rightTrigger: (state["rightTrigger"] as num).toInt(),
+              leftX: (state["leftX"] as num).toInt(),
+              leftY: (state["leftY"] as num).toInt(),
+              rightX: (state["rightX"] as num).toInt(),
+              rightY: (state["rightY"] as num).toInt(),
+            ));
+            break;
+          }
         case "stop_service":
           {
             print(

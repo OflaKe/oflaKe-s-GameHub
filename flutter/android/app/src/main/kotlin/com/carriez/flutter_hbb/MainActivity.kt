@@ -10,6 +10,7 @@ package com.carriez.flutter_hbb
 import ffi.FFI
 
 import android.app.Activity
+import android.hardware.input.InputManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -19,6 +20,9 @@ import android.os.Bundle
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import android.view.InputDevice
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.WindowManager
 import android.media.MediaCodecInfo
 import android.media.MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
@@ -42,6 +46,23 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
+private const val XINPUT_DPAD_UP = 0x0001
+private const val XINPUT_DPAD_DOWN = 0x0002
+private const val XINPUT_DPAD_LEFT = 0x0004
+private const val XINPUT_DPAD_RIGHT = 0x0008
+private const val XINPUT_START = 0x0010
+private const val XINPUT_BACK = 0x0020
+private const val XINPUT_LEFT_THUMB = 0x0040
+private const val XINPUT_RIGHT_THUMB = 0x0080
+private const val XINPUT_LEFT_SHOULDER = 0x0100
+private const val XINPUT_RIGHT_SHOULDER = 0x0200
+private const val XINPUT_GUIDE = 0x0400
+private const val XINPUT_A = 0x1000
+private const val XINPUT_B = 0x2000
+private const val XINPUT_X = 0x4000
+private const val XINPUT_Y = 0x8000
+private const val DPAD_MASK = 0x000F
+private const val MICROSOFT_VENDOR_ID = 0x045e
 
 class MainActivity : FlutterActivity() {
     companion object {
@@ -74,6 +95,33 @@ class MainActivity : FlutterActivity() {
 
     private var isAudioStart = false
     private val audioRecordHandle = AudioRecordHandle(this, { false }, { isAudioStart })
+    private var forwardXboxGamepad = false
+    private val gamepadStates = mutableMapOf<Int, XboxGamepadState>()
+    private val inputDeviceListener = object : InputManager.InputDeviceListener {
+        override fun onInputDeviceAdded(deviceId: Int) = Unit
+
+        override fun onInputDeviceChanged(deviceId: Int) = Unit
+
+        override fun onInputDeviceRemoved(deviceId: Int) {
+            if (gamepadStates.remove(deviceId) != null) {
+                sendXboxGamepadState(XboxGamepadState())
+            }
+        }
+    }
+
+    private data class XboxGamepadState(
+        var buttons: Int = 0,
+        var dpadKeys: Int = 0,
+        var dpadHat: Int = 0,
+        var leftTrigger: Int = 0,
+        var rightTrigger: Int = 0,
+        var leftTriggerKeyDown: Boolean = false,
+        var rightTriggerKeyDown: Boolean = false,
+        var leftX: Int = 0,
+        var leftY: Int = 0,
+        var rightX: Int = 0,
+        var rightY: Int = 0
+    )
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -98,12 +146,148 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        (getSystemService(Context.INPUT_SERVICE) as? InputManager)
+            ?.registerInputDeviceListener(inputDeviceListener, null)
         val inputPer = InputService.isOpen
         activity.runOnUiThread {
             flutterMethodChannel?.invokeMethod(
                 "on_state_changed",
                 mapOf("name" to "input", "value" to inputPer.toString())
             )
+        }
+    }
+
+    override fun onPause() {
+        resetXboxGamepadStates()
+        (getSystemService(Context.INPUT_SERVICE) as? InputManager)
+            ?.unregisterInputDeviceListener(inputDeviceListener)
+        super.onPause()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (!forwardXboxGamepad || !isMicrosoftXboxDevice(event.deviceId) ||
+            !isGamepadSource(event.source)) {
+            return super.dispatchKeyEvent(event)
+        }
+        val state = gamepadStates.getOrPut(event.deviceId) { XboxGamepadState() }
+        val button = xboxButtonForKey(event.keyCode)
+        if (button != 0) {
+            val isDpad = button.and(DPAD_MASK) != 0
+            val buttonState = if (isDpad) state.dpadKeys else state.buttons
+            val updated = when (event.action) {
+                KeyEvent.ACTION_DOWN -> buttonState or button
+                KeyEvent.ACTION_UP -> buttonState and button.inv()
+                else -> buttonState
+            }
+            if (isDpad) {
+                state.dpadKeys = updated
+            } else {
+                state.buttons = updated
+            }
+            sendXboxGamepadState(state)
+            return true
+        }
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_BUTTON_L2 -> state.leftTriggerKeyDown = isKeyDown(event)
+            KeyEvent.KEYCODE_BUTTON_R2 -> state.rightTriggerKeyDown = isKeyDown(event)
+            else -> return super.dispatchKeyEvent(event)
+        }
+        sendXboxGamepadState(state)
+        return true
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (!forwardXboxGamepad || !isMicrosoftXboxDevice(event.deviceId) ||
+            event.action != MotionEvent.ACTION_MOVE ||
+            event.isFromSource(InputDevice.SOURCE_JOYSTICK).not()) {
+            return super.dispatchGenericMotionEvent(event)
+        }
+        val state = gamepadStates.getOrPut(event.deviceId) { XboxGamepadState() }
+        state.leftX = axisToShort(event.getAxisValue(MotionEvent.AXIS_X))
+        state.leftY = -axisToShort(event.getAxisValue(MotionEvent.AXIS_Y))
+        state.rightX = axisToShort(axisWithFallback(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX))
+        state.rightY = -axisToShort(axisWithFallback(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY))
+        state.leftTrigger = axisToTrigger(event, MotionEvent.AXIS_LTRIGGER, MotionEvent.AXIS_BRAKE)
+        state.rightTrigger = axisToTrigger(event, MotionEvent.AXIS_RTRIGGER, MotionEvent.AXIS_GAS)
+        val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+        val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+        state.dpadHat = 0
+        if (hatX < -0.5f) state.dpadHat = state.dpadHat or XINPUT_DPAD_LEFT
+        if (hatX > 0.5f) state.dpadHat = state.dpadHat or XINPUT_DPAD_RIGHT
+        if (hatY < -0.5f) state.dpadHat = state.dpadHat or XINPUT_DPAD_UP
+        if (hatY > 0.5f) state.dpadHat = state.dpadHat or XINPUT_DPAD_DOWN
+        sendXboxGamepadState(state)
+        return true
+    }
+
+    private fun isGamepadSource(source: Int): Boolean =
+        (source and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+            (source and InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD
+
+    private fun isMicrosoftXboxDevice(deviceId: Int): Boolean =
+        InputDevice.getDevice(deviceId)?.vendorId == MICROSOFT_VENDOR_ID
+
+    private fun xboxButtonForKey(keyCode: Int): Int = when (keyCode) {
+        KeyEvent.KEYCODE_BUTTON_A -> XINPUT_A
+        KeyEvent.KEYCODE_BUTTON_B -> XINPUT_B
+        KeyEvent.KEYCODE_BUTTON_X -> XINPUT_X
+        KeyEvent.KEYCODE_BUTTON_Y -> XINPUT_Y
+        KeyEvent.KEYCODE_BUTTON_L1 -> XINPUT_LEFT_SHOULDER
+        KeyEvent.KEYCODE_BUTTON_R1 -> XINPUT_RIGHT_SHOULDER
+        KeyEvent.KEYCODE_BUTTON_THUMBL -> XINPUT_LEFT_THUMB
+        KeyEvent.KEYCODE_BUTTON_THUMBR -> XINPUT_RIGHT_THUMB
+        KeyEvent.KEYCODE_BUTTON_START -> XINPUT_START
+        KeyEvent.KEYCODE_BUTTON_SELECT -> XINPUT_BACK
+        KeyEvent.KEYCODE_BUTTON_MODE -> XINPUT_GUIDE
+        KeyEvent.KEYCODE_DPAD_UP -> XINPUT_DPAD_UP
+        KeyEvent.KEYCODE_DPAD_DOWN -> XINPUT_DPAD_DOWN
+        KeyEvent.KEYCODE_DPAD_LEFT -> XINPUT_DPAD_LEFT
+        KeyEvent.KEYCODE_DPAD_RIGHT -> XINPUT_DPAD_RIGHT
+        else -> 0
+    }
+
+    private fun isKeyDown(event: KeyEvent): Boolean = event.action == KeyEvent.ACTION_DOWN
+
+    private fun axisWithFallback(event: MotionEvent, primary: Int, fallback: Int): Float {
+        val primaryValue = event.getAxisValue(primary)
+        return if (primaryValue != 0f) primaryValue else event.getAxisValue(fallback)
+    }
+
+    private fun axisToShort(value: Float): Int =
+        (value.coerceIn(-1f, 1f) * 32767f).toInt()
+
+    private fun axisToTrigger(event: MotionEvent, primary: Int, fallback: Int): Int {
+        val primaryValue = event.getAxisValue(primary)
+        val value = if (primaryValue != 0f) primaryValue else event.getAxisValue(fallback)
+        return (value.coerceIn(0f, 1f) * 255f).toInt()
+    }
+
+    private fun sendXboxGamepadState(state: XboxGamepadState) {
+        flutterMethodChannel?.invokeMethod(
+            "xbox_gamepad_input",
+            mapOf(
+                "buttons" to (state.buttons or state.dpadKeys or state.dpadHat),
+                "leftTrigger" to maxOf(state.leftTrigger, if (state.leftTriggerKeyDown) 255 else 0),
+                "rightTrigger" to maxOf(state.rightTrigger, if (state.rightTriggerKeyDown) 255 else 0),
+                "leftX" to state.leftX,
+                "leftY" to state.leftY,
+                "rightX" to state.rightX,
+                "rightY" to state.rightY
+            )
+        )
+    }
+
+    private fun setXboxGamepadForwarding(enabled: Boolean) {
+        if (!enabled) {
+            resetXboxGamepadStates()
+        }
+        forwardXboxGamepad = enabled
+    }
+
+    private fun resetXboxGamepadStates() {
+        if (gamepadStates.isNotEmpty()) {
+            sendXboxGamepadState(XboxGamepadState())
+            gamepadStates.clear()
         }
     }
 
@@ -292,6 +476,10 @@ class MainActivity : FlutterActivity() {
                     } ?: let {
                         result.success(false)
                     }
+                }
+                "set_gamepad_forwarding" -> {
+                    setXboxGamepadForwarding(call.arguments as? Boolean == true)
+                    result.success(true)
                 }
                 "check_permission" -> {
                     if (call.arguments is String) {

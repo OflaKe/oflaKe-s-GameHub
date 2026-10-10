@@ -196,6 +196,16 @@ message MouseEvent {
   repeated ControlKey modifiers = 4;
 }
 
+message XboxGamepadEvent {
+  uint32 buttons = 1;
+  uint32 left_trigger = 2;
+  uint32 right_trigger = 3;
+  sint32 left_x = 4;
+  sint32 left_y = 5;
+  sint32 right_x = 6;
+  sint32 right_y = 7;
+}
+
 enum KeyboardMode{
   Legacy = 0;
   Map = 1;
@@ -1030,5 +1040,6 @@ message Message {
     TerminalAction terminal_action = 31;
     TerminalResponse terminal_response = 32;
     PortForwardChannel port_forward_channel = 33;
+    XboxGamepadEvent xbox_gamepad_event = 34;
   }
 }

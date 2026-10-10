@@ -1339,6 +1339,20 @@ class RustdeskImpl {
         () => js.context.callMethod('setByName', ['send_mouse', msg]));
   }
 
+  Future<void> sessionSendXboxGamepadEvent({
+    required UuidValue sessionId,
+    required int buttons,
+    required int leftTrigger,
+    required int rightTrigger,
+    required int leftX,
+    required int leftY,
+    required int rightX,
+    required int rightY,
+    dynamic hint,
+  }) {
+    throw UnimplementedError("sessionSendXboxGamepadEvent");
+  }
+
   Future<void> sessionRestartRemoteDevice(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['restart']));

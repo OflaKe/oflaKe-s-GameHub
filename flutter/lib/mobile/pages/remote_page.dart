@@ -76,6 +76,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   var _showEdit = false; // use soft keyboard
 
   Worker? _waylandKeyboardGateWorker;
+  Worker? _xboxGamepadWorker;
   bool _waylandKeyboardGateInitialized = false;
 
   InputModel get inputModel => gFFI.inputModel;
@@ -108,6 +109,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     WakelockManager.enable(_uniqueKey);
     _physicalFocusNode.requestFocus();
     gFFI.inputModel.listenToMouse(true);
+    gFFI.invokeMethod("set_gamepad_forwarding", true);
     gFFI.qualityMonitorModel.checkShowQualityMonitor(sessionId);
     keyboardSubscription =
         keyboardVisibilityController.onChange.listen(onSoftKeyboardChanged);
@@ -124,6 +126,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
           isKeyboardVisible: keyboardVisibilityController.isVisible);
     });
     WidgetsBinding.instance.addObserver(this);
+
+    _xboxGamepadWorker = ever(gFFI.ffiModel.pi.isSet, (_) {
+      _syncXboxGamepadForwarding();
+    });
+    _syncXboxGamepadForwarding();
 
     inputModel.keyboardInputAllowed = true;
 
@@ -143,6 +150,8 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   @override
   Future<void> dispose() async {
     WidgetsBinding.instance.removeObserver(this);
+    _xboxGamepadWorker?.dispose();
+    await gFFI.invokeMethod("set_gamepad_forwarding", false);
     // Close the session up-front. `gFFI.close()` below only calls `sessionClose`
     // after several awaits (canvas save, image update, the `enable_soft_keyboard`
     // platform call), so if the app is backgrounded while this page is disposing,
@@ -189,6 +198,12 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   // When swithing from other app to this app, try to sync clipboard.
   void trySyncClipboard() {
     gFFI.invokeMethod("try_sync_clipboard");
+  }
+
+  void _syncXboxGamepadForwarding() {
+    final isWindowsPeer = gFFI.ffiModel.pi.isSet.value &&
+        gFFI.ffiModel.pi.platform == kPeerPlatformWindows;
+    gFFI.invokeMethod("set_gamepad_forwarding", isWindowsPeer);
   }
 
   bool _shouldGateKeyboardForWayland() {
