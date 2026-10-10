@@ -782,6 +782,8 @@ impl<T: InvokeUiSession> Session<T> {
 
     pub fn send_xbox_gamepad_event(
         &self,
+        controller_id: i32,
+        disconnected: bool,
         buttons: u32,
         left_trigger: u32,
         right_trigger: u32,
@@ -792,6 +794,8 @@ impl<T: InvokeUiSession> Session<T> {
     ) {
         let mut msg_out = Message::new();
         msg_out.set_xbox_gamepad_event(XboxGamepadEvent {
+            controller_id,
+            disconnected,
             buttons,
             left_trigger,
             right_trigger,

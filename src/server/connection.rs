@@ -1243,7 +1243,7 @@ impl Connection {
     fn handle_input(receiver: std_mpsc::Receiver<MessageInput>, tx: Sender) {
         let mut block_input_mode = false;
         #[cfg(target_os = "windows")]
-        let mut xbox_gamepad = crate::server::gamepad::XboxGamepad::default();
+        let mut xbox_gamepads = std::collections::HashMap::new();
         #[cfg(any(target_os = "windows", target_os = "macos"))]
         {
             rdev::set_mouse_extra_info(enigo::ENIGO_INPUT_EXTRA_VALUE);
@@ -1281,13 +1281,20 @@ impl Connection {
                     }
                     #[cfg(target_os = "windows")]
                     MessageInput::XboxGamepad(event) => {
-                        if !block_input_mode {
-                            xbox_gamepad.update(&event);
+                        if event.disconnected {
+                            xbox_gamepads.remove(&event.controller_id);
+                        } else if !block_input_mode {
+                            xbox_gamepads
+                                .entry(event.controller_id)
+                                .or_insert_with(crate::server::gamepad::XboxGamepad::default)
+                                .update(&event);
                         }
                     }
                     MessageInput::BlockOn => {
                         #[cfg(target_os = "windows")]
-                        xbox_gamepad.release();
+                        for gamepad in xbox_gamepads.values_mut() {
+                            gamepad.release();
+                        }
                         let (ok, msg) = crate::platform::block_input(true);
                         if ok {
                             block_input_mode = true;
@@ -3206,7 +3213,7 @@ impl Connection {
                     {
                         let keyboard_enabled = self.peer_keyboard_enabled();
                         crate::server::gamepad::trace_received(event.buttons, keyboard_enabled);
-                        if keyboard_enabled {
+                        if keyboard_enabled || event.disconnected {
                             self.tx_input.send(MessageInput::XboxGamepad(event)).ok();
                             self.update_auto_disconnect_timer();
                         }

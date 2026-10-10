@@ -202,8 +202,10 @@ message XboxGamepadEvent {
   uint32 right_trigger = 3;
   sint32 left_x = 4;
   sint32 left_y = 5;
-  sint32 right_x = 6;
-  sint32 right_y = 7;
+    sint32 right_x = 6;
+    sint32 right_y = 7;
+    sint32 controller_id = 8;
+    bool disconnected = 9;
 }
 
 enum KeyboardMode{

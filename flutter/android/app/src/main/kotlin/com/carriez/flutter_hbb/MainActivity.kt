@@ -104,7 +104,7 @@ class MainActivity : FlutterActivity() {
 
         override fun onInputDeviceRemoved(deviceId: Int) {
             if (gamepadStates.remove(deviceId) != null) {
-                sendXboxGamepadState(XboxGamepadState())
+                sendXboxGamepadState(deviceId, XboxGamepadState(), disconnected = true)
             }
         }
     }
@@ -184,7 +184,7 @@ class MainActivity : FlutterActivity() {
             } else {
                 state.buttons = updated
             }
-            sendXboxGamepadState(state)
+            sendXboxGamepadState(event.deviceId, state)
             return true
         }
         when (event.keyCode) {
@@ -192,7 +192,7 @@ class MainActivity : FlutterActivity() {
             KeyEvent.KEYCODE_BUTTON_R2 -> state.rightTriggerKeyDown = isKeyDown(event)
             else -> return super.dispatchKeyEvent(event)
         }
-        sendXboxGamepadState(state)
+        sendXboxGamepadState(event.deviceId, state)
         return true
     }
 
@@ -216,7 +216,7 @@ class MainActivity : FlutterActivity() {
         if (hatX > 0.5f) state.dpadHat = state.dpadHat or XINPUT_DPAD_RIGHT
         if (hatY < -0.5f) state.dpadHat = state.dpadHat or XINPUT_DPAD_UP
         if (hatY > 0.5f) state.dpadHat = state.dpadHat or XINPUT_DPAD_DOWN
-        sendXboxGamepadState(state)
+        sendXboxGamepadState(event.deviceId, state)
         return true
     }
 
@@ -262,10 +262,16 @@ class MainActivity : FlutterActivity() {
         return (value.coerceIn(0f, 1f) * 255f).toInt()
     }
 
-    private fun sendXboxGamepadState(state: XboxGamepadState) {
+    private fun sendXboxGamepadState(
+        deviceId: Int,
+        state: XboxGamepadState,
+        disconnected: Boolean = false
+    ) {
         flutterMethodChannel?.invokeMethod(
             "xbox_gamepad_input",
             mapOf(
+                "controllerId" to deviceId,
+                "disconnected" to disconnected,
                 "buttons" to (state.buttons or state.dpadKeys or state.dpadHat),
                 "leftTrigger" to maxOf(state.leftTrigger, if (state.leftTriggerKeyDown) 255 else 0),
                 "rightTrigger" to maxOf(state.rightTrigger, if (state.rightTriggerKeyDown) 255 else 0),
@@ -286,7 +292,9 @@ class MainActivity : FlutterActivity() {
 
     private fun resetXboxGamepadStates() {
         if (gamepadStates.isNotEmpty()) {
-            sendXboxGamepadState(XboxGamepadState())
+            gamepadStates.keys.toList().forEach { deviceId ->
+                sendXboxGamepadState(deviceId, XboxGamepadState())
+            }
             gamepadStates.clear()
         }
     }

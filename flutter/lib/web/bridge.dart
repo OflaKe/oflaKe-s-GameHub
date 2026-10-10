@@ -1340,8 +1340,10 @@ class RustdeskImpl {
   }
 
   Future<void> sessionSendXboxGamepadEvent({
-    required UuidValue sessionId,
-    required int buttons,
+      required UuidValue sessionId,
+      required int controllerId,
+      required bool disconnected,
+      required int buttons,
     required int leftTrigger,
     required int rightTrigger,
     required int leftX,

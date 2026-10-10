@@ -937,6 +937,8 @@ void androidChannelInit() {
             final state = arguments as Map;
             unawaited(bind.sessionSendXboxGamepadEvent(
               sessionId: gFFI.sessionId,
+              controllerId: (state["controllerId"] as num).toInt(),
+              disconnected: state["disconnected"] == true,
               buttons: (state["buttons"] as num).toInt(),
               leftTrigger: (state["leftTrigger"] as num).toInt(),
               rightTrigger: (state["rightTrigger"] as num).toInt(),

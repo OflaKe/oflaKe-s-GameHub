@@ -2055,6 +2055,8 @@ pub fn session_send_mouse(session_id: SessionID, msg: String) {
 
 pub fn session_send_xbox_gamepad_event(
     session_id: SessionID,
+    controller_id: i32,
+    disconnected: bool,
     buttons: u32,
     left_trigger: u32,
     right_trigger: u32,
@@ -2065,6 +2067,8 @@ pub fn session_send_xbox_gamepad_event(
 ) {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
         session.send_xbox_gamepad_event(
+            controller_id,
+            disconnected,
             buttons,
             left_trigger,
             right_trigger,

@@ -25,3 +25,7 @@ Forwarding is enabled automatically only for Android sessions whose peer reports
 ## Verified checkpoint
 
 On 2026-10-02, one Xbox controller was verified end to end from the Galaxy S21 to the Windows host. The Windows diagnostic log confirmed incoming reports and a ready ViGEm Xbox 360 target; the user confirmed the controller works in-game. This checkpoint supports one controller per RustDesk session. Multiple controllers are not supported yet: reports do not carry a controller ID, and the Windows input worker owns one virtual target.
+
+## Two-controller work in progress
+
+The follow-up implementation now carries Android's per-device ID and a disconnect flag through the protocol. The Windows input worker keeps a separate ViGEm target for each ID and removes that target when Android reports the controller unplugged. The Windows build and Rust type-check pass; the Android package has not been rebuilt or tested with two controllers yet.
